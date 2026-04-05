@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -65,7 +65,19 @@ function HuvudTabs() {
 }
 
 export default function AppNavigator() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, kollar } = useAuth();
+
+  // Vänta på att AsyncStorage-kontrollen är klar — undviker Login-flash
+  if (kollar) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.primary }}>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={{ color: 'rgba(255,255,255,0.7)', marginTop: 12, fontSize: 14 }}>
+          serviceOS
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>

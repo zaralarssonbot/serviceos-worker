@@ -26,8 +26,15 @@ export async function registreraPushToken(workerId) {
     return null;
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync();
-  const expoToken = tokenData.data;
+  let expoToken;
+  try {
+    // SDK 50+: projectId krävs på produktionsbuilds
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    expoToken = tokenData.data;
+  } catch (e) {
+    console.log('[PUSH] getExpoPushTokenAsync misslyckades:', e.message);
+    return null;
+  }
   console.log('[PUSH] Token:', expoToken);
 
   // Skicka token till backend

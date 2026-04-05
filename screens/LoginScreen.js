@@ -4,9 +4,10 @@ import {
   Platform, StatusBar,
 } from 'react-native';
 import Knapp from '../components/Knapp';
-import { sparaWorkerData, COLORS } from '../services/auth';
+import { COLORS } from '../services/auth';
 import { registreraPushToken } from '../services/push';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function LoginScreen() {
   const { loggaIn, sparaWorker } = useAuth();
@@ -25,15 +26,31 @@ export default function LoginScreen() {
     try {
       await loggaIn(username.trim(), password);
 
-      // Spara worker-data (mock tills worker-profil kopplas)
-      const workerData = {
-        id: 'demo-worker',
-        fornamn: 'Demo',
-        efternamn: 'Worker',
-        email: username.trim(),
-        kommunskattesats: 0.32,
-        f_skatt_godkand: false,
-      };
+      // Hämta riktig worker-profil från API:et (matchar på e-post)
+      let workerData = null;
+      try {
+        const resp = await api.get('/api/workers/', { params: { limit: 200 } });
+        const workers = resp.data?.items || [];
+        const u = username.trim().toLowerCase();
+        workerData = workers.find(w =>
+          w.email?.toLowerCase() === u ||
+          w.email?.toLowerCase().startsWith(u)
+        ) || null;
+      } catch (e) {
+        console.log('[LOGIN] Worker-sökning misslyckades:', e.message);
+      }
+
+      // Fallback om ingen worker-profil hittades (t.ex. admin-konto)
+      if (!workerData) {
+        workerData = {
+          id: null,
+          fornamn: username.trim(),
+          efternamn: '',
+          email: username.trim(),
+          kommunskattesats: 0.32,
+          f_skatt_godkand: false,
+        };
+      }
       await sparaWorker(workerData);
 
       // Registrera Expo push-token i bakgrunden — blockerar ej login

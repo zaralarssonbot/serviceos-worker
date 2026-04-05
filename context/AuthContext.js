@@ -1,17 +1,41 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loggaIn as apiLoggaIn, loggaUt as apiLoggaUt, sparaWorkerData, hamtaWorkerData } from '../services/auth';
+import { loggaIn as apiLoggaIn, loggaUt as apiLoggaUt, sparaWorkerData, hamtaWorkerData, hamtaSparatToken } from '../services/auth';
 import { setAuthToken, clearAuthToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Token hålls i minnet — inga async-problem, aldrig null mellan renders
   const [token, setToken] = useState(null);
   const [worker, setWorker] = useState(null);
+  // true medan vi kontrollerar AsyncStorage på start — förhindrar Login-flash
+  const [kollar, setKollar] = useState(true);
+
+  // ── Återställ session från AsyncStorage vid appstart ──────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const [sparadToken, sparadWorker] = await Promise.all([
+          hamtaSparatToken(),
+          hamtaWorkerData(),
+        ]);
+        if (sparadToken) {
+          setAuthToken(sparadToken);
+          setToken(sparadToken);
+        }
+        if (sparadWorker) {
+          setWorker(sparadWorker);
+        }
+      } catch (e) {
+        console.log('[AUTH] Kunde inte återställa session:', e.message);
+      } finally {
+        setKollar(false);
+      }
+    })();
+  }, []);
 
   const loggaIn = useCallback(async (username, password) => {
-    const data = await apiLoggaIn(username, password);
+    const data = await apiLoggaIn(username, password);   // sparar token till AsyncStorage
     setToken(data.access_token);
     return data;
   }, []);
@@ -28,10 +52,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loggaUt = useCallback(async () => {
-    clearAuthToken();
+    await apiLoggaUt();   // rensar AsyncStorage + in-memory token
     setToken(null);
     setWorker(null);
-    await AsyncStorage.removeItem('worker_data');
   }, []);
 
   return (
@@ -39,6 +62,7 @@ export function AuthProvider({ children }) {
       token,
       worker,
       isAuthenticated: !!token,
+      kollar,   // true = kontrollerar sparad session, visa splash istället för login
       loggaIn,
       loggaUt,
       sparaWorker,
