@@ -11,20 +11,29 @@ export const clearAuthToken = () => { _accessToken = null; };
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
-  headers: { 'Content-Type': 'application/json' },
+  // 30s timeout — Railway kan ha cold starts på ~20s efter inaktivitet
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
 });
 
-// Synkron interceptor — läser från minnet, inte AsyncStorage
+// ── Request interceptor ───────────────────────────────────────
 api.interceptors.request.use((config) => {
   console.log(`[API] ${config.method?.toUpperCase()} ${config.url} | token: ${_accessToken ? 'SET' : 'NULL'}`);
   if (_accessToken) {
     config.headers.Authorization = `Bearer ${_accessToken}`;
   }
+  // Säkerställ att Accept och Content-Type alltid finns
+  config.headers['Accept'] = 'application/json';
+  if (config.method !== 'get' && config.method !== 'delete') {
+    config.headers['Content-Type'] = 'application/json';
+  }
   return config;
 });
 
-// Fånga 401 och logga ut
+// ── Response interceptor — fånga 401 och logga ut ────────────
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -40,15 +49,56 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Klassificera axios-fel till ett läsbart felmeddelande på svenska.
+ * Används av screens för att visa rätt meddelande.
+ */
+export const klassficeraFel = (error) => {
+  // Timeout (ECONNABORTED) eller ingen respons alls
+  if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    return {
+      typ: 'timeout',
+      meddelande:
+        'Servern svarar inte just nu.\n' +
+        'Railway startar upp efter inaktivitet — detta tar 15–25 sekunder.\n' +
+        'Försök igen om en stund.',
+      åtgärd: 'retry',
+    };
+  }
+  // Inget nätverk / DNS-fel
+  if (!error.response) {
+    const code = error.code || '';
+    if (code === 'ERR_NETWORK' || code === 'ERR_INTERNET_DISCONNECTED') {
+      return {
+        typ: 'offline',
+        meddelande: 'Ingen nätverksanslutning.\nKontrollera WiFi eller mobildata.',
+        åtgärd: 'retry',
+      };
+    }
+    return {
+      typ: 'nätverk',
+      meddelande: `Nätverksfel (${code || error.message}).\nURL: ${(error.config?.baseURL || '') + (error.config?.url || '')}`,
+      åtgärd: 'retry',
+    };
+  }
+  // HTTP-fel
+  const status = error.response.status;
+  const detail = error.response.data?.detail;
+  if (status === 401) return { typ: '401', meddelande: detail || 'Fel användarnamn eller lösenord.', åtgärd: 'lösenord' };
+  if (status === 422) {
+    const msgs = Array.isArray(detail) ? detail.map(d => d.msg).join(', ') : String(detail || 'Valideringsfel');
+    return { typ: '422', meddelande: `Ogiltiga uppgifter: ${msgs}`, åtgärd: 'inmatning' };
+  }
+  if (status === 429) return { typ: '429', meddelande: 'För många försök — vänta en minut.', åtgärd: 'vänta' };
+  if (status >= 500) return { typ: 'server', meddelande: `Serverfel (${status}) — försök igen.`, åtgärd: 'retry' };
+  return { typ: String(status), meddelande: `HTTP ${status}: ${detail || error.message}`, åtgärd: 'retry' };
+};
+
 // ── Auth ──────────────────────────────────────────────────────
 export const login = async (username, password) => {
-  const url = `${BASE_URL}/api/auth/login`;
-  const body = { username, password };
-  console.log('[LOGIN] POST', url);
-  console.log('[LOGIN] Body:', JSON.stringify(body));
-  const res = await api.post('/api/auth/login', body);
+  console.log('[LOGIN] POST', `${BASE_URL}/api/auth/login`);
+  const res = await api.post('/api/auth/login', { username, password });
   console.log('[LOGIN] Status:', res.status);
-  console.log('[LOGIN] Data:', JSON.stringify(res.data));
   return res.data;
 };
 

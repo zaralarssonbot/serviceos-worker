@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, StyleSheet, KeyboardAvoidingView,
-  Platform, StatusBar,
+  Platform, StatusBar, TouchableOpacity,
 } from 'react-native';
 import Knapp from '../components/Knapp';
 import { COLORS } from '../services/auth';
 import { registreraPushToken } from '../services/push';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { klassficeraFel } from '../services/api';
 
 export default function LoginScreen() {
   const { loggaIn, sparaWorker } = useAuth();
@@ -15,18 +15,35 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [fel, setFel] = useState('');
+  const [felTyp, setFelTyp] = useState('');         // 'timeout' | 'offline' | 'lösenord' | ...
+  const [förfluten, setFörfluten] = useState(0);    // sekunder sedan knappen trycktes
+  const timerRef = useRef(null);
+
+  // Sekund-räknare under inloggningsförsök
+  useEffect(() => {
+    if (loading) {
+      setFörfluten(0);
+      timerRef.current = setInterval(() => setFörfluten(s => s + 1), 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [loading]);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       setFel('Fyll i användarnamn och lösenord');
+      setFelTyp('inmatning');
       return;
     }
     setFel('');
+    setFelTyp('');
     setLoading(true);
+
     try {
       await loggaIn(username.trim(), password);
 
-      // Hämta riktig worker-profil från API:et (matchar på e-post)
+      // Hämta riktig worker-profil (matchar på e-post)
       let workerData = null;
       try {
         const resp = await api.get('/api/workers/', { params: { limit: 200 } });
@@ -40,7 +57,7 @@ export default function LoginScreen() {
         console.log('[LOGIN] Worker-sökning misslyckades:', e.message);
       }
 
-      // Fallback om ingen worker-profil hittades (t.ex. admin-konto)
+      // Fallback för admin-konton utan worker-profil
       if (!workerData) {
         workerData = {
           id: null,
@@ -53,32 +70,20 @@ export default function LoginScreen() {
       }
       await sparaWorker(workerData);
 
-      // Registrera Expo push-token i bakgrunden — blockerar ej login
+      // Push-token i bakgrunden — blockerar ej
       registreraPushToken(workerData.id).catch(e =>
         console.log('[PUSH] Registrering misslyckades:', e.message)
       );
 
-      // isAuthenticated i AuthContext triggar AppNavigator att visa HuvudTabs
     } catch (err) {
-      const httpStatus = err.response?.status;
-      const serverMsg = err.response?.data?.detail;
-      const reqUrl = (err.config?.baseURL || '') + (err.config?.url || '');
-      console.log('[LOGIN] FEL:', JSON.stringify({
-        message: err.message, code: err.code, status: httpStatus,
-        url: reqUrl, response: err.response?.data,
-      }));
-      if (!err.response) {
-        setFel(`Nätverksfel\nURL: ${reqUrl || 'okänd'}\nFel: ${err.message}\nKod: ${err.code || '-'}`);
-      } else if (httpStatus === 401) {
-        setFel(`401 – ${serverMsg || 'Fel användarnamn eller lösenord'}`);
-      } else if (httpStatus === 422) {
-        const details = Array.isArray(serverMsg)
-          ? serverMsg.map(d => d.msg).join(', ')
-          : JSON.stringify(err.response?.data);
-        setFel(`422 Valideringsfel – ${details}`);
-      } else {
-        setFel(`HTTP ${httpStatus} – ${serverMsg || err.message}`);
-      }
+      console.log('[LOGIN] FEL:', {
+        message: err.message, code: err.code,
+        status: err.response?.status,
+        url: (err.config?.baseURL || '') + (err.config?.url || ''),
+      });
+      const klassad = klassficeraFel(err);
+      setFel(klassad.meddelande);
+      setFelTyp(klassad.typ);
     } finally {
       setLoading(false);
     }
@@ -134,11 +139,16 @@ export default function LoginScreen() {
         {!!fel && (
           <View style={styles.felBox}>
             <Text style={styles.felText}>⚠ {fel}</Text>
+            {felTyp === 'timeout' && (
+              <TouchableOpacity style={styles.retryKnapp} onPress={handleLogin}>
+                <Text style={styles.retryText}>Försök igen</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         <Knapp
-          title="Logga in"
+          title={loading ? `Ansluter... (${förfluten}s)` : 'Logga in'}
           onPress={handleLogin}
           loading={loading}
           style={styles.loginKnapp}
@@ -186,6 +196,12 @@ const styles = StyleSheet.create({
     marginBottom: 16, borderLeftWidth: 3, borderLeftColor: COLORS.error,
   },
   felText: { color: COLORS.error, fontSize: 14, fontWeight: '500' },
+  retryKnapp: {
+    marginTop: 10, alignSelf: 'flex-start',
+    backgroundColor: COLORS.error, borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 7,
+  },
+  retryText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   loginKnapp: { marginTop: 8 },
   tips: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 12, marginTop: 16 },
 });
