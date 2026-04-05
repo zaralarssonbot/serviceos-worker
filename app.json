@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "serviceOS-worker",
-    "slug": "serviceOS-worker",
+    "name": "serviceOS Worker",
+    "slug": "serviceos-worker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,20 +10,71 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0d9488"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.serviceos.worker",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Vi behöver din plats för att visa jobb nära dig och verifiera att du är på plats.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Vi delar din position med kunden i realtid under pågående uppdrag.",
+        "NSLocationAlwaysUsageDescription": "Vi delar din position med kunden i realtid under pågående uppdrag.",
+        "NSCameraUsageDescription": "Kameran används för att ta kvittensbilder och dokumentation.",
+        "NSPhotoLibraryUsageDescription": "Åtkomst till bilder används för profilbild och kvittensuppladdning.",
+        "NSFaceIDUsageDescription": "Face ID används för snabb och säker inloggning.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "associatedDomains": ["applinks:serviceos.app"]
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0d9488"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.serviceos.worker",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-location",
+      "expo-camera",
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "BYTA-UT-TILL-EAS-PROJECT-ID"
+      },
+      "privacyPolicyUrl": "https://serviceos.app/integritetspolicy",
+      "termsOfServiceUrl": "https://serviceos.app/anvandarvillkor",
+      "supportEmail": "support@serviceos.app"
+    },
+    "owner": "serviceos"
   }
 }
