@@ -46,7 +46,7 @@ export default function LoginScreen() {
       // Hämta riktig worker-profil (matchar på e-post)
       let workerData = null;
       try {
-        const resp = await api.get('/api/workers/', { params: { limit: 200 } });
+        const resp = await api.get('/api/workers/', { params: { limit: 100 } });
         const workers = resp.data?.items || [];
         const u = username.trim().toLowerCase();
         workerData = workers.find(w =>

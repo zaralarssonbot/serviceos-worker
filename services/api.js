@@ -112,7 +112,7 @@ export const getWorker = async (workerId) => {
 export const getSchema = async (workerId, from, to) => {
   const params = { fran: from, till: to };
   if (workerId) params.worker_id = workerId;
-  const res = await api.get('/api/schema', { params });
+  const res = await api.get('/api/schema/', { params });
   return res.data;
 };
 
@@ -123,7 +123,7 @@ export const getJobb = async (jobbId) => {
 };
 
 export const getJobbForWorker = async (workerId) => {
-  const res = await api.get('/api/jobb', { params: { worker_id: workerId } });
+  const res = await api.get('/api/jobb/', { params: { worker_id: workerId } });
   return res.data;
 };
 
@@ -139,7 +139,7 @@ export const avslutaJobb = async (jobbId, lat, lng) => {
 
 // ── Löner ─────────────────────────────────────────────────────
 export const getLoner = async (workerId) => {
-  const res = await api.get('/api/loner', { params: { worker_id: workerId } });
+  const res = await api.get('/api/loner/', { params: { worker_id: workerId } });
   return res.data;
 };
 
